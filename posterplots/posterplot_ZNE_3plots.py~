@@ -1,0 +1,212 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import InterpolatedUnivariateSpline
+from obspy.signal.cross_correlation import xcorr
+import os
+import glob
+import cPickle as pickle
+from obspy.core import UTCDateTime
+from obspy.signal.filter import bandpass
+import datetime
+from obspy.core import read, UTCDateTime
+from matplotlib.dates import YearLocator, MonthLocator, DayLocator, DateFormatter, date2num, num2date
+from matplotlib import ticker
+import time
+
+# PLOTPOSTER ZNE
+dates = np.load('/import/sun-data/hable/STACK/W025_1/dates.npy')
+
+
+startdate = dates[0].tolist()
+startdate = [num2date(x) for x in startdate]
+
+# add 15 days to startdate and convert UTCDateTime list to python datetime objects:
+date = []
+for i in xrange(0,len(startdate)):
+    datum = startdate[i] + datetime.timedelta(days=15)
+    date.append(datum)
+
+
+ar_f1 = np.load('/import/sun-data/hable/epsCC/F025_1/averages2/arrays/average_F025_1_ZNE.npy')
+ar_f2 = np.load('/import/sun-data/hable/epsCC/F05_2/averages2/arrays/average_F05_2_ZNE.npy')
+ar_f3 = np.load('/import/sun-data/hable/epsCC/F1_4/averages2/arrays/average_F1_4_ZNE.npy')
+
+botheps_f1 = []
+botheps_f2 = []
+botheps_f3 = []
+bothCC_f1 = []
+bothCC_f2 = []
+bothCC_f3 = []
+bothquality_f1 = []
+bothquality_f2 = []
+bothquality_f3 = []
+
+for i in xrange(0, ar_f1.shape[0]):
+    botheps_f1.append(ar_f1[i][6])
+    bothCC_f1.append(ar_f1[i][7])
+    bothquality_f1.append(ar_f1[i][8])
+    
+for i in xrange(0, ar_f2.shape[0]):
+    botheps_f2.append(ar_f2[i][6])
+    bothCC_f2.append(ar_f2[i][7])
+    bothquality_f2.append(ar_f2[i][8])
+    
+for i in xrange(0, ar_f3.shape[0]):
+    botheps_f3.append(ar_f3[i][6])
+    bothCC_f3.append(ar_f3[i][7])
+    bothquality_f3.append(ar_f3[i][8])
+    
+print(len(botheps_f3), len(date[0:-1]))
+
+botheps_f1 = np.asarray(botheps_f1)
+botheps_f2 = np.asarray(botheps_f2)
+botheps_f3 = np.asarray(botheps_f3)
+
+lineup_f1 = 0.0
+lineup_f2 = 0.0
+lineup_f3 = 0.0
+
+botheps_f1 = botheps_f1 * (-100) + lineup_f1
+botheps_f2 = botheps_f2 * (-100) + lineup_f2
+botheps_f3 = botheps_f3 * (-100) + lineup_f3
+
+# format the ticks
+years = YearLocator()   # every year
+months = MonthLocator()  # every month
+
+# define date of earthquakes
+parkfield = datetime.datetime(2004,9,28)
+#parkfield = date2num(earthquake1)
+sansimeon = datetime.datetime(2003,12,22)
+#sansimeon = date2num(earthquake2)
+
+# define xlim:
+startdatum = datetime.datetime(2002, 11, 1)
+enddatum = datetime.datetime(2007, 3, 1)
+
+# plot epsilons with corresponding CC
+fig = plt.figure(figsize=(11.69,8.27))
+fig.suptitle('\n Relative velocity change and correlation coefficients for all stations, \n' \
+	     'all components (NN, NE, NZ, EN, EE, EZ, ZN, ZE, ZZ), frequency band: 0.25-1.0 Hz', fontsize=15, fontweight='bold')
+
+fig.add_subplot(2,1,1)
+ax1 = plt.gca()
+im = ax1.scatter(date, botheps_f1, c=bothquality_f1, vmin=0.0, vmax=1.0, cmap='YlOrRd', edgecolor='None')
+ax1.set_ylabel('$\Delta$v/v (%) \n', fontsize = 12)
+fig.add_subplot(2,1,2)
+ax2 = plt.gca()
+ax2.scatter(date, bothCC_f1, c=bothquality_f1, vmin=0.0, vmax=1.0, cmap='YlOrRd', edgecolor='None')
+ax2.set_ylabel('correlation coefficient \n \n', fontsize = 12)
+
+for axx in [ax1]:
+    axx.set_ylim(-0.125, 0.125)
+    axx.yaxis.set_ticks([-0.1, -0.05, 0.0, 0.05, 0.1])
+    axx.set_xlim(startdatum, enddatum)
+for axxx in [ax2]:
+    axxx.set_ylim(-0.05, 1.05)
+    axxx.yaxis.set_ticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    axxx.set_xlim(startdatum, enddatum)
+    
+for ax in [ax1, ax2]:
+    ax.xaxis.set_major_locator(years)
+    ax.xaxis.set_major_formatter(DateFormatter('%Y'))
+    ax.xaxis.set_minor_locator(months)
+    ax.grid()
+    ax.axvline(x=parkfield, color='k',ls='dashed', lw=1.4)
+    ax.axvline(x=sansimeon, color='k',ls='dashed', lw=1.4)
+    
+fig.subplots_adjust(bottom=0.2, top=0.85, hspace=0.3)
+#fig.subplots_adjust(bottom=0.2, wspace=0.45, top=0.81, hspace=0.3) 
+cbar_ax = fig.add_axes([0.15, 0.1, 0.7, 0.02])
+cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+cb.set_label('data quality')
+
+plt.savefig('/import/sun-data/hable/posterplots/ZNE_F025_1.pdf')
+plt.close()
+
+
+
+
+fig = plt.figure(figsize=(11.69,8.27))
+fig.suptitle('\n Relative velocity change and correlation coefficients for all stations, \n' \
+	     'all components (NN, NE, NZ, EN, EE, EZ, ZN, ZE, ZZ), frequency band: 0.5-2.0 Hz', fontsize=15, fontweight='bold')
+
+fig.add_subplot(2,1,1)
+ax1 = plt.gca()
+im = ax1.scatter(date, botheps_f2, c=bothquality_f2, vmin=0.0, vmax=1.0, cmap='YlOrRd', edgecolor='None')
+ax1.set_ylabel('$\Delta$v/v (%) \n', fontsize = 12)
+fig.add_subplot(2,1,2)
+ax2 = plt.gca()
+ax2.scatter(date, bothCC_f2, c=bothquality_f2, vmin=0.0, vmax=1.0, cmap='YlOrRd', edgecolor='None')
+ax2.set_ylabel('correlation coefficient \n \n', fontsize = 12)
+
+for axx in [ax1]:
+    axx.set_ylim(-0.125, 0.125)
+    axx.yaxis.set_ticks([-0.1, -0.05, 0.0, 0.05, 0.1])
+    axx.set_xlim(startdatum, enddatum)
+for axxx in [ax2]:
+    axxx.set_ylim(-0.05, 1.05)
+    axxx.yaxis.set_ticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    axxx.set_xlim(startdatum, enddatum)
+    
+for ax in [ax1, ax2]:
+    ax.xaxis.set_major_locator(years)
+    ax.xaxis.set_major_formatter(DateFormatter('%Y'))
+    ax.xaxis.set_minor_locator(months)
+    ax.grid()
+    ax.axvline(x=parkfield, color='k',ls='dashed', lw=1.4)
+    ax.axvline(x=sansimeon, color='k',ls='dashed', lw=1.4)
+    
+fig.subplots_adjust(bottom=0.2, top=0.85, hspace=0.3)
+cbar_ax = fig.add_axes([0.15, 0.1, 0.7, 0.02])
+cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+cb.set_label('data quality')
+
+plt.savefig('/import/sun-data/hable/posterplots/ZNE_F05_2.pdf')
+plt.close()
+
+
+
+
+
+fig = plt.figure(figsize=(11.69,8.27))
+fig.suptitle('\n Relative velocity change and correlation coefficients for all stations, \n' \
+	     'all components (NN, NE, NZ, EN, EE, EZ, ZN, ZE, ZZ), frequency band: 1.0-4.0 Hz', fontsize=15, fontweight='bold')
+
+fig.add_subplot(2,1,1)
+ax1 = plt.gca()
+im = ax1.scatter(date[0:-1], botheps_f3, c=bothquality_f3, vmin=0.0, vmax=1.0, cmap='YlOrRd', edgecolor='None')
+ax1.set_ylabel('$\Delta$v/v (%) \n', fontsize = 12)
+fig.add_subplot(2,1,2)
+ax2 = plt.gca()
+ax2.scatter(date[0:-1], bothCC_f3, c=bothquality_f3, vmin=0.0, vmax=1.0, cmap='YlOrRd', edgecolor='None')
+ax2.set_ylabel('correlation coefficient \n \n', fontsize = 12)
+
+for axx in [ax1]:
+    axx.set_ylim(-0.125, 0.125)
+    axx.yaxis.set_ticks([-0.1, -0.05, 0.0, 0.05, 0.1])
+    axx.set_xlim(startdatum, enddatum)
+for axxx in [ax2]:
+    axxx.set_ylim(-0.05, 1.05)
+    axxx.yaxis.set_ticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    axxx.set_xlim(startdatum, enddatum)
+    
+for ax in [ax1, ax2]:
+    ax.xaxis.set_major_locator(years)
+    ax.xaxis.set_major_formatter(DateFormatter('%Y'))
+    ax.xaxis.set_minor_locator(months)
+    ax.grid()
+    ax.axvline(x=parkfield, color='k',ls='dashed', lw=1.4)
+    ax.axvline(x=sansimeon, color='k',ls='dashed', lw=1.4)
+    
+fig.subplots_adjust(bottom=0.2, top=0.85, hspace=0.3)
+cbar_ax = fig.add_axes([0.15, 0.1, 0.7, 0.02])
+cb = fig.colorbar(im, cax=cbar_ax, orientation='horizontal', ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+cb.set_label('data quality')
+
+plt.savefig('/import/sun-data/hable/posterplots/ZNE_F1_4.pdf')
+plt.close()
